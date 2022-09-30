@@ -1,11 +1,12 @@
-const { Markup, Composer, Scenes } = require('telegraf')
+import { Markup, Composer, Scenes } from 'telegraf';
+import SellRequest from '../models/SellRequest.js';
 
 const startStep = new Composer();
 
 startStep.on('text', async (ctx) => {
     ctx.wizard.state.data = {};
     ctx.wizard.state.data.userName = ctx.message.from.username;
-    await ctx.replyWithHTML('Какую валютe вы хотите продать\n Например USDT', Markup.keyboard(
+    await ctx.replyWithHTML('Какую валюту вы хотите продать\n Например USDT', Markup.keyboard(
         [
             [Markup.button.callback('USDT', 'USDT'), Markup.button.callback('EUR', 'EUR')]
         ]
@@ -13,9 +14,9 @@ startStep.on('text', async (ctx) => {
     return ctx.wizard.next();
 })
 
-const titleStep = new Composer();
+const sellStep = new Composer();
 
-titleStep.on('text', async (ctx) => {
+sellStep.on('text', async (ctx) => {
     ctx.wizard.state.data.sellCurrency = ctx.message.text;
     await ctx.replyWithHTML('Какое количество вы хотите продать\n Например 1000');
     return ctx.wizard.next();
@@ -37,17 +38,22 @@ const priceStep = new Composer();
 
 priceStep.on('text', async (ctx) => {
     ctx.wizard.state.data.buyCurrency = ctx.message.text;
-    await ctx.replyWithHTML('По какому курсу вы хотите продать\n Например 1');
+    await ctx.replyWithHTML('По какому курсу вы хотите продать\n Например 1', Markup.inlineKeyboard(
+        [
+            [Markup.button.callback('По рынку', 'market')]
+        ]
+    ).oneTime().resize());
     return ctx.wizard.next();
 })
 
-const finalStep = new Composer();
+const confirmStep = new Composer();
 
-finalStep.on('text', async (ctx) => {
-    ctx.wizard.state.data.price = ctx.message.text;
+confirmStep.action('market', async (ctx) => {
+    await ctx.answerCbQuery()
+    ctx.wizard.state.data.price = 'рыночный';
 
-    reqData = ctx.wizard.state.data;
-    await ctx.replyWithHTML(`Вы хотите продать ${reqData.count} ${reqData.sellCurrency}. Получить за них ${reqData.buyCurrency} по курсу${reqData.price}.\nОформляем заявку?`, Markup.keyboard(
+    const reqData = ctx.wizard.state.data;
+    await ctx.replyWithHTML(`Вы хотите продать ${reqData.count} ${reqData.sellCurrency}. Получить за них ${reqData.buyCurrency} по курсу ${reqData.price}.\nОформляем заявку?`, Markup.keyboard(
         [
             [Markup.button.callback('yes', 'yes'), Markup.button.callback('no', 'no')]
         ]
@@ -55,6 +61,32 @@ finalStep.on('text', async (ctx) => {
     return ctx.wizard.next();
 })
 
-const sellRequestScene = new Scenes.WizardScene('sellRequestScene', startStep, titleStep, buyStep, priceStep, finalStep);
+confirmStep.on('text', async (ctx) => {
+    ctx.wizard.state.data.price = ctx.message.text;
 
-module.exports = sellRequestScene;
+    const reqData = ctx.wizard.state.data;
+    await ctx.replyWithHTML(`Вы хотите продать ${reqData.count} ${reqData.sellCurrency}. Получить за них ${reqData.buyCurrency} по курсу ${reqData.price}.\nОформляем заявку?`, Markup.keyboard(
+        [
+            [Markup.button.callback('yes', 'yes'), Markup.button.callback('no', 'no')]
+        ]
+    ).oneTime().resize());
+    return ctx.wizard.next();
+})
+
+const finalStep = new Composer();
+
+finalStep.on('text', async (ctx) => {
+    if (ctx.message.text === 'yes') {
+        const user_id = ctx.session.state.getDataValue('id');
+        const {sellCurrency, count, buyCurrency, price} = ctx.wizard.state.data;
+        await SellRequest.create({ sellCurrency, count, buyCurrency, price, user_id });
+        await ctx.replyWithHTML('Заявка успешно оформлена');
+    } else {
+        await ctx.replyWithHTML('Заявка отменена');
+    }
+    return ctx.scene.leave();
+})
+
+const sellRequestScene = new Scenes.WizardScene('sellRequestScene', startStep, sellStep, buyStep, priceStep, confirmStep, finalStep);
+
+export default sellRequestScene;
