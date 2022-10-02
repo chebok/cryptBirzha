@@ -1,5 +1,5 @@
 import { Markup, Composer, Scenes } from 'telegraf';
-import SellRequest from '../models/SellRequest.js';
+import { SellRequest } from '../models/models.js';
 
 const startStep = new Composer();
 
@@ -8,7 +8,7 @@ startStep.on('text', async (ctx) => {
     ctx.wizard.state.data.userName = ctx.message.from.username;
     await ctx.replyWithHTML('Какую валюту вы хотите продать\n Например USDT', Markup.keyboard(
         [
-            [Markup.button.callback('USDT', 'USDT'), Markup.button.callback('EUR', 'EUR')]
+            [Markup.button.callback('USDT', 'USDT'), Markup.button.callback('BTC', 'BTC'), , Markup.button.callback('ETH', 'ETH')]
         ]
     ).oneTime().resize());
     return ctx.wizard.next();
@@ -28,7 +28,7 @@ buyStep.on('text', async (ctx) => {
     ctx.wizard.state.data.count = ctx.message.text;
     await ctx.replyWithHTML('Какую валюты вы хотите получить\n Например BTC', Markup.keyboard(
         [
-            [Markup.button.callback('BTC', 'BTC'), Markup.button.callback('ETH', 'ETH')]
+            [Markup.button.callback('USD', 'USD'), Markup.button.callback('EUR', 'EUR'), Markup.button.callback('RUB', 'RUB')]
         ]
     ).oneTime().resize());
     return ctx.wizard.next();
@@ -55,7 +55,8 @@ confirmStep.action('market', async (ctx) => {
     const reqData = ctx.wizard.state.data;
     await ctx.replyWithHTML(`Вы хотите продать ${reqData.count} ${reqData.sellCurrency}. Получить за них ${reqData.buyCurrency} по курсу ${reqData.price}.\nОформляем заявку?`, Markup.keyboard(
         [
-            [Markup.button.callback('yes', 'yes'), Markup.button.callback('no', 'no')]
+            [Markup.button.callback('Оформить', 'Оформить'), Markup.button.callback('Изменить', 'Изменить')],
+            [Markup.button.callback('Выйти из оформления', 'Выйти из оформления')],
         ]
     ).oneTime().resize());
     return ctx.wizard.next();
@@ -67,7 +68,8 @@ confirmStep.on('text', async (ctx) => {
     const reqData = ctx.wizard.state.data;
     await ctx.replyWithHTML(`Вы хотите продать ${reqData.count} ${reqData.sellCurrency}. Получить за них ${reqData.buyCurrency} по курсу ${reqData.price}.\nОформляем заявку?`, Markup.keyboard(
         [
-            [Markup.button.callback('yes', 'yes'), Markup.button.callback('no', 'no')]
+            [Markup.button.callback('Оформить', 'Оформить'), Markup.button.callback('Изменить', 'Изменить')],
+            [Markup.button.callback('Выйти из оформления', 'Выйти из оформления')],
         ]
     ).oneTime().resize());
     return ctx.wizard.next();
@@ -76,13 +78,18 @@ confirmStep.on('text', async (ctx) => {
 const finalStep = new Composer();
 
 finalStep.on('text', async (ctx) => {
-    if (ctx.message.text === 'yes') {
-        const user_id = ctx.session.state.getDataValue('id');
+    if (ctx.message.text === 'Оформить') {
+        const userId = ctx.session.state.id;
         const {sellCurrency, count, buyCurrency, price} = ctx.wizard.state.data;
-        await SellRequest.create({ sellCurrency, count, buyCurrency, price, user_id });
+        await SellRequest.create({ sellCurrency, count, buyCurrency, price, user_id: userId });
         await ctx.replyWithHTML('Заявка успешно оформлена');
-    } else {
-        await ctx.replyWithHTML('Заявка отменена');
+    } if (ctx.message.text === 'Изменить') {
+        await ctx.replyWithHTML('Заявка отменена', Markup.keyboard(
+            [
+                [Markup.button.callback('Возврат на начало', 'return')]
+            ]
+        ).oneTime().resize());
+        return ctx.wizard.selectStep(ctx.wizard.cursor - 5);
     }
     return ctx.scene.leave();
 })
