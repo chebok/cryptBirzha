@@ -1,5 +1,6 @@
 import { Markup, Composer, Scenes } from 'telegraf';
 import { SellRequest } from '../models/models.js';
+import getMarketRate from '../src/getMarketRate.js';
 
 const startStep = new Composer();
 
@@ -28,7 +29,7 @@ buyStep.on('text', async (ctx) => {
     ctx.wizard.state.data.count = ctx.message.text;
     await ctx.replyWithHTML('Какую валюты вы хотите получить\n Например BTC', Markup.keyboard(
         [
-            [Markup.button.callback('USD', 'USD'), Markup.button.callback('EUR', 'EUR'), Markup.button.callback('RUB', 'RUB')]
+            [Markup.button.callback('USD 💵', 'USD'), Markup.button.callback('EUR 💶', 'EUR'), Markup.button.callback('RUB ', 'RUB')]
         ]
     ).oneTime().resize());
     return ctx.wizard.next();
@@ -50,9 +51,9 @@ const confirmStep = new Composer();
 
 confirmStep.action('market', async (ctx) => {
     await ctx.answerCbQuery()
-    ctx.wizard.state.data.price = 'рыночный';
-
     const reqData = ctx.wizard.state.data;
+    ctx.wizard.state.data.price = await getMarketRate(reqData.sellCurrency, reqData.buyCurrency).catch(e => console.log(e));
+
     await ctx.replyWithHTML(`Вы хотите продать ${reqData.count} ${reqData.sellCurrency}. Получить за них ${reqData.buyCurrency} по курсу ${reqData.price}.\nОформляем заявку?`, Markup.keyboard(
         [
             [Markup.button.callback('Оформить', 'Оформить'), Markup.button.callback('Изменить', 'Изменить')],

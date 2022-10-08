@@ -5,7 +5,6 @@ const startStep = new Composer();
 
 startStep.on('text', async (ctx) => {
     ctx.wizard.state.userData = await User.findOne({where: {username: ctx.message.chat.username}, include: [SellRequest, BuyRequest] });
-    console.log(ctx.wizard.state.userData);
     await ctx.replyWithHTML('Какие ордеры посмотреть', Markup.inlineKeyboard(
         [
             [Markup.button.callback('продажа', 'продажа'), Markup.button.callback('покупка', 'покупка')]
@@ -20,7 +19,7 @@ viewRequests.action('продажа', async (ctx) => {
     await ctx.answerCbQuery();
     const userData = ctx.wizard.state.userData;
     if (userData.sell_requests.length === 0) {
-        await ctx.replyWithHTML('Заявка нет', Markup.keyboard(
+        await ctx.replyWithHTML('Заявок нет', Markup.keyboard(
             [
                 [Markup.button.callback('Возврат на начало', 'return')]
             ]
@@ -44,10 +43,14 @@ viewRequests.action('покупка', async (ctx) => {
         ).oneTime().resize());
         return ctx.scene.leave();
     }
-    const reqsWithButton = userData.buy_requests.map(async (req) => {
-        const selReq = await SellRequest.findOne({where: {id: req.sell_request_id}});
-        return [Markup.button.callback(`Покупка ${req.count} ${selReq.sellCurrency} за твои ${selReq.buyCurrency} по курсу ${selReq.price}`, `buy ${req.id}`)];
-    })
+    const reqsWithButton = userData.buy_requests.map((req) => {
+        console.log(req);
+        // const selReq = await SellRequest.findOne({where: {id: req.sell_request_id}});
+        // console.log(selReq);
+        const result = [Markup.button.callback(`Покупка ${req.count} ${req.id}`, `buy ${req.id}`)];
+        return result;
+    });
+    console.log(reqsWithButton);
     await ctx.replyWithHTML('Выбери заявку которую хочешь редактировать', Markup.inlineKeyboard(reqsWithButton));
     
     return ctx.wizard.next();
